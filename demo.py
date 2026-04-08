@@ -2,10 +2,49 @@ import streamlit as st
 import google.genai as genai
 from dotenv import load_dotenv
 import os
+import json
 
 load_dotenv() 
 
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
+
+def generate_mock_evaluation(idea_input):
+    """Gera uma avaliação simulada como fallback quando a API está com quota excedida."""
+    scores = [7, 8, 7.5, 8.5, 6.5, 7, 8, 7.5]
+    idea_hash = sum(ord(c) for c in idea_input) % len(scores)
+    score = scores[idea_hash]
+    
+    pros = [
+        "✓ Clear problem-solution fit",
+        "✓ Growing market opportunity",
+        "✓ Scalable business model"
+    ]
+    
+    cons = [
+        "✗ Increasing competition",
+        "✗ High customer acquisition cost",
+        "✗ Regulatory uncertainties"
+    ]
+    
+    evaluation = f"""### Summary
+This is a promising startup concept with good market potential. The idea addresses a real problem and has a reasonable path to profitability. With proper execution and market validation, this could become a viable business.
+
+### Pros & Cons
+
+**Pros:**
+- {pros[0]}
+- {pros[1]}
+- {pros[2]}
+
+**Cons:**
+- {cons[0]}
+- {cons[1]}
+- {cons[2]}
+
+### IdeaScore: {score}/10
+The concept shows strong potential with adequate market demand and execution feasibility."""
+    
+    return evaluation
 
 st.set_page_config(page_title="IdeaEvaluator", layout="wide")
 
@@ -90,5 +129,25 @@ with tab_evaluate:
                     st.info("💡 **Next Steps:** Use these insights to validate your idea with real users. Remember, the IdeaScore is just a guide, execution is what matters!")
                     
                 except Exception as e:
-                    st.error(f"An error occurred while connecting to the Google Gemini API: {e}")
+                    error_str = str(e)
+                    
+                    # Exceded quota handling
+                    if "429" in error_str or "RESOURCE_EXHAUSTED" in error_str:
+                        st.warning(
+                            "⚠️ **API Quota Exceeded** - Your free tier quota has been reached. "
+                            "Please upgrade your plan or try again later. "
+                            "For now, showing a sample evaluation:"
+                        )
+                        
+                        # Fallback
+                        mock_evaluation = generate_mock_evaluation(idea_input)
+                        
+                        st.markdown("---")
+                        st.subheader("📊 Sample Evaluation Results")
+                        st.info("💡 **This is a simulated example** - To get real AI-powered insights, please upgrade your Gemini API plan.")
+                        
+                        with st.container():
+                            st.markdown(mock_evaluation)
+                    else:
+                        st.error(f"An error occurred while connecting to the Google Gemini API: {e}")
 
